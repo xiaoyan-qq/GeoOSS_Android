@@ -189,7 +189,7 @@ public class GeoCameraViewActivity extends BaseActivity {
             @Override
             public void onVideoTaken(File video) {
                 super.onVideoTaken(video);
-
+ 
             }
         });
     }
