@@ -1,18 +1,27 @@
 package com.example.xiaoxiao.geooss_android;
 
-import android.support.v7.app.AppCompatActivity;
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 
-public class MainActivity extends AppCompatActivity {
+import com.example.xiaoxiao.geooss_android.base.BaseActivity;
+import com.just.agentweb.AgentWeb;
+
+public class MainActivity extends BaseActivity {
 
     private Button btn_preview_video/*视频拍摄按钮*/, btn_open_url/*打开指定url按钮*/;
+    private AgentWeb mAgentWeb;
+    private ViewGroup rootView;
+    private static final String TAG="MainActivity" ;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        rootView= (ViewGroup) LayoutInflater.from(this).inflate(R.layout.activity_main,null);
+        setContentView(rootView);
         initView();
     }
 
@@ -29,7 +38,8 @@ public class MainActivity extends AppCompatActivity {
         btn_open_url.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {//打开指定url
-
+                Intent openWebIntent=new Intent(MainActivity.this,BaseWebActivity.class);
+                startActivity(openWebIntent);
             }
         });
     }
