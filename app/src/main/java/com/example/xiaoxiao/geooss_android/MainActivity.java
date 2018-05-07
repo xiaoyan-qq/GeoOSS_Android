@@ -31,7 +31,8 @@ public class MainActivity extends BaseActivity {
         btn_preview_video.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {//视频拍摄
-
+                Intent openWebIntent=new Intent(MainActivity.this,GeoCameraViewActivity.class);
+                startActivity(openWebIntent);
             }
         });
 

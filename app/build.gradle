@@ -21,9 +21,9 @@ android {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.android.support:appcompat-v7:27.0.2'
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'com.android.support.test:runner:1.0.1'
-    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
+//    testImplementation 'junit:junit:4.12'
+//    androidTestImplementation 'com.android.support.test:runner:1.0.1'
+//    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
     implementation 'com.android.support:design:27.0.2'
     // (3.0.0开始该库可选)
     implementation 'com.android.support:support-v4:27.0.2'
@@ -33,4 +33,11 @@ dependencies {
     implementation 'com.just.agentweb:filechooser:4.0.2'// (可选)
     //拍照工具https://github.com/natario1/CameraView
     implementation 'com.otaliastudios:cameraview:1.5.0'
+    compile 'us.feras.mdv:markdownview:1.1.0'
+    compile 'com.lcodecorex:tkrefreshlayout:1.0.7'
+    compile 'com.google.code.gson:gson:2.3.1'
+    //https://github.com/vondear/RxTools
+    compile 'com.github.vondear:RxTools:v1.7.7.3'
+    //https://github.com/yanzhenjie/AndPermission
+    implementation 'com.yanzhenjie:permission:2.0.0-rc3'//动态获取权限的三方库
 }

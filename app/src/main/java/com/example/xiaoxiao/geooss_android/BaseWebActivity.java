@@ -56,6 +56,7 @@ public class BaseWebActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_web);
 
+        initView();
 
         mLinearLayout = (LinearLayout) this.findViewById(R.id.container);
         mTitleTextView = (TextView) this.findViewById(R.id.toolbar_title);
@@ -208,7 +209,7 @@ public class BaseWebActivity extends AppCompatActivity {
     };
 
     public String getUrl() {
-        return "https://m.jd.com/";
+        return "http://geodev.oss-cn-beijing.aliyuncs.com/";
     }
 
 
