@@ -40,4 +40,8 @@ dependencies {
     compile 'com.github.vondear:RxTools:v1.7.7.3'
     //https://github.com/yanzhenjie/AndPermission
     implementation 'com.yanzhenjie:permission:2.0.0-rc3'//动态获取权限的三方库
+    //阿里云的OSS SDK库https://help.aliyun.com/document_detail/32042.html?spm=a2c4g.11186623.6.707.xQwDJc
+    compile 'com.aliyun.dpa:oss-android-sdk:+'
+    compile 'com.squareup.okhttp3:okhttp:3.4.1'
+    compile 'com.squareup.okio:okio:1.9.0'
 }
