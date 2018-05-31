@@ -17,12 +17,10 @@ import com.alibaba.sdk.android.oss.OSSClient;
 import com.alibaba.sdk.android.oss.ServiceException;
 import com.alibaba.sdk.android.oss.callback.OSSCompletedCallback;
 import com.alibaba.sdk.android.oss.callback.OSSProgressCallback;
-import com.alibaba.sdk.android.oss.common.OSSConstants;
 import com.alibaba.sdk.android.oss.common.OSSLog;
 import com.alibaba.sdk.android.oss.common.auth.OSSCredentialProvider;
 import com.alibaba.sdk.android.oss.common.auth.OSSFederationCredentialProvider;
 import com.alibaba.sdk.android.oss.common.auth.OSSFederationToken;
-import com.alibaba.sdk.android.oss.common.utils.IOUtils;
 import com.alibaba.sdk.android.oss.internal.OSSAsyncTask;
 import com.alibaba.sdk.android.oss.model.PutObjectRequest;
 import com.alibaba.sdk.android.oss.model.PutObjectResult;
@@ -30,8 +28,10 @@ import com.example.xiaoxiao.geooss_android.base.BaseActivity;
 import com.otaliastudios.cameraview.CameraListener;
 import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.SessionType;
+import com.vondear.rxtools.RxDataTool;
 import com.vondear.rxtools.RxFileTool;
 import com.vondear.rxtools.RxTimeTool;
+import com.vondear.rxtools.RxTool;
 import com.vondear.rxtools.view.RxToast;
 import com.vondear.rxtools.view.dialog.RxDialogSure;
 import com.vondear.rxtools.view.dialog.RxDialogSureCancel;
@@ -44,17 +44,21 @@ import com.yanzhenjie.permission.RequestExecutor;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class GeoCameraViewActivity extends BaseActivity {
     private Button btn_video_time_add, btn_video_time_sub;
     private TextView tv_camera_time_value;
     private CameraView mCameraView;
     private ToggleButton tbtn_camera;
+    private final String DEVICE_ID = "10000000000000000002";//测试用的deviceId，用来获取sts服务返回的token
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -248,16 +252,32 @@ public class GeoCameraViewActivity extends BaseActivity {
             @Override
             public OSSFederationToken getFederationToken() {
                 try {
-                    URL stsUrl = new URL("http://204.152.208.92:7080/distribute-token.json");
-                    HttpURLConnection conn = (HttpURLConnection) stsUrl.openConnection();
-                    InputStream input = conn.getInputStream();
-                    String jsonText = IOUtils.readStreamAsString(input, OSSConstants.DEFAULT_CHARSET_NAME);
-                    JSONObject jsonObjs = new JSONObject(jsonText);
-                    String ak = jsonObjs.getString("AccessKeyId");
-                    String sk = jsonObjs.getString("AccessKeySecret");
-                    String token = jsonObjs.getString("SecurityToken");
-                    String expiration = jsonObjs.getString("Expiration");
-                    return new OSSFederationToken(ak, sk, token, expiration);
+                    String aaaMd5 = RxTool.Md5("aaa");
+                    System.out.print("Md5------------" + RxTool.Md5("aaa"));
+                    OkHttpClient httpClient = new OkHttpClient();
+                    String deviceId = DEVICE_ID;
+                    String currentTimeTamp = String.valueOf(new Date().getTime());
+//                    RequestBody body = new FormBody.Builder().add("deviceId", deviceId).add("timestamp", currentTimeTamp).add("sign", RxTool.Md5(deviceId + currentTimeTamp)).build();
+                    HttpUrl url = new HttpUrl.Builder()
+                            .scheme("http")
+                            .host("47.104.153.134")
+                            .addPathSegments("/sts/auth")
+                            .addQueryParameter("deviceId", deviceId).addQueryParameter("timestamp", currentTimeTamp).addQueryParameter("sign", RxTool.Md5(deviceId + currentTimeTamp))
+                            .build();
+                    Request ossCredentialRequest = new Request.Builder().url(url).build();
+                    Response response = httpClient.newCall(ossCredentialRequest).execute();
+                    if (response != null) {
+                        String responseStr = response.body().string();
+                        if (!RxDataTool.isEmpty(responseStr)) {
+                            System.out.print(responseStr);
+                            JSONObject jsonObjs = new JSONObject(responseStr);
+                            String ak = jsonObjs.getString("AccessKeyId");
+                            String sk = jsonObjs.getString("AccessKeySecret");
+                            String token = jsonObjs.getString("SecurityToken");
+                            String expiration = jsonObjs.getString("Expiration");
+                            return new OSSFederationToken(ak, sk, token, expiration);
+                        }
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -276,36 +296,15 @@ public class GeoCameraViewActivity extends BaseActivity {
         uploadData(oss);
     }
 
-    OSSCredentialProvider credetialProvider = new OSSFederationCredentialProvider() {
-        @Override
-        public OSSFederationToken getFederationToken() {
-            try {
-                URL stsUrl = new URL("http://localhost:8080/distribute-token.json");
-                HttpURLConnection conn = (HttpURLConnection) stsUrl.openConnection();
-                InputStream input = conn.getInputStream();
-                String jsonText = IOUtils.readStreamAsString(input, OSSConstants.DEFAULT_CHARSET_NAME);
-                JSONObject jsonObjs = new JSONObject(jsonText);
-                String ak = jsonObjs.getString("AccessKeyId");
-                String sk = jsonObjs.getString("AccessKeySecret");
-                String token = jsonObjs.getString("SecurityToken");
-                String expiration = jsonObjs.getString("Expiration");
-                return new OSSFederationToken(ak, sk, token, expiration);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            return null;
-        }
-    };
-
     /**
+     * @param :
+     * @return :
      * @method :
      * @Author : xiaoxiao
      * @Describe :
-     * @param :
-     * @return :
      * @Date : 2018/5/18
-    */
-    private void uploadData(OSS oss){
+     */
+    private void uploadData(OSS oss) {
         // 构造上传请求
         PutObjectRequest put = new PutObjectRequest("xiaoxiao-test-1", "name", new String("测试name").getBytes());
         // 异步上传时可以设置进度回调
@@ -320,6 +319,7 @@ public class GeoCameraViewActivity extends BaseActivity {
             public void onSuccess(PutObjectRequest request, PutObjectResult result) {
                 Log.d("PutObject", "UploadSuccess");
             }
+
             @Override
             public void onFailure(PutObjectRequest request, ClientException clientExcepion, ServiceException serviceException) {
                 // 请求异常
