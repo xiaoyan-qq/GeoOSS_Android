@@ -1,37 +1,23 @@
 package com.example.xiaoxiao.geooss_android;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
-import com.alibaba.sdk.android.oss.ClientConfiguration;
-import com.alibaba.sdk.android.oss.ClientException;
-import com.alibaba.sdk.android.oss.OSS;
-import com.alibaba.sdk.android.oss.OSSClient;
-import com.alibaba.sdk.android.oss.ServiceException;
-import com.alibaba.sdk.android.oss.callback.OSSCompletedCallback;
-import com.alibaba.sdk.android.oss.callback.OSSProgressCallback;
-import com.alibaba.sdk.android.oss.common.OSSLog;
-import com.alibaba.sdk.android.oss.common.auth.OSSCredentialProvider;
-import com.alibaba.sdk.android.oss.common.auth.OSSFederationCredentialProvider;
-import com.alibaba.sdk.android.oss.common.auth.OSSFederationToken;
-import com.alibaba.sdk.android.oss.internal.OSSAsyncTask;
-import com.alibaba.sdk.android.oss.model.PutObjectRequest;
-import com.alibaba.sdk.android.oss.model.PutObjectResult;
 import com.example.xiaoxiao.geooss_android.base.BaseActivity;
+import com.example.xiaoxiao.geooss_android.util.SystemConstant;
 import com.otaliastudios.cameraview.CameraListener;
+import com.otaliastudios.cameraview.CameraUtils;
 import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.SessionType;
-import com.vondear.rxtools.RxDataTool;
 import com.vondear.rxtools.RxFileTool;
 import com.vondear.rxtools.RxTimeTool;
-import com.vondear.rxtools.RxTool;
 import com.vondear.rxtools.view.RxToast;
 import com.vondear.rxtools.view.dialog.RxDialogSure;
 import com.vondear.rxtools.view.dialog.RxDialogSureCancel;
@@ -41,24 +27,20 @@ import com.yanzhenjie.permission.Permission;
 import com.yanzhenjie.permission.Rationale;
 import com.yanzhenjie.permission.RequestExecutor;
 
-import org.json.JSONObject;
-
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
-
-import okhttp3.HttpUrl;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 public class GeoCameraViewActivity extends BaseActivity {
     private Button btn_video_time_add, btn_video_time_sub;
+    private View layer_time_control;//控制视频拍摄时间的layer
+    private ToggleButton tbtn_video_pic_switch;//切换拍照或摄像功能
     private TextView tv_camera_time_value;
     private CameraView mCameraView;
     private ToggleButton tbtn_camera;
-    private final String DEVICE_ID = "10000000000000000002";//测试用的deviceId，用来获取sts服务返回的token
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -149,11 +131,14 @@ public class GeoCameraViewActivity extends BaseActivity {
     };
 
     private void initView() {
+        layer_time_control = findViewById(R.id.layer_video_time_control);
         btn_video_time_add = findViewById(R.id.btn_video_time_add);
         btn_video_time_sub = findViewById(R.id.btn_video_time_sub);
         tv_camera_time_value = findViewById(R.id.tv_camera_time_value);
+        tbtn_video_pic_switch = findViewById(R.id.tbtn_video_pic_switch);
+
         mCameraView = findViewById(R.id.camera);
-        mCameraView.setSessionType(SessionType.VIDEO);
+        mCameraView.setSessionType(SessionType.VIDEO);//默认为摄像
         tbtn_camera = findViewById(R.id.tbtn_camera);
 
         btn_video_time_add.setOnClickListener(new View.OnClickListener() {
@@ -172,7 +157,7 @@ public class GeoCameraViewActivity extends BaseActivity {
         btn_video_time_sub.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                //增加每次的录制时间
+                //减少每次的录制时间
                 int currentTimeLength = Integer.parseInt(tv_camera_time_value.getText().toString());
                 if (currentTimeLength <= 1) {
                     RxToast.info("最小时间不能小于1分钟");
@@ -183,39 +168,59 @@ public class GeoCameraViewActivity extends BaseActivity {
             }
         });
 
+        tbtn_video_pic_switch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                if (b) {//选中状态下为拍照
+                    mCameraView.setSessionType(SessionType.PICTURE);
+                } else {//非选中状态下为摄像
+                    mCameraView.setSessionType(SessionType.VIDEO);
+                }
+            }
+        });
+
         tbtn_camera.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                if (b) {//开始录制，隐藏设置时间的按钮
-                    setVideoTimeLengthBtnVisiable(false);
-                    int currentTimeLength = Integer.parseInt(tv_camera_time_value.getText().toString());
-                    mCameraView.setVideoMaxDuration(currentTimeLength * 1000);
-                    if (RxFileTool.isSDCardEnable()) {
-                        File videoFile = new File(RxFileTool.getSDCardPath() + "/GeoOSS/video/" + RxTimeTool.date2String(RxTimeTool.getCurTimeDate(), new SimpleDateFormat("yyyyMMddhhmmss")) + ".mp4");
-                        if (!videoFile.getParentFile().exists()) {
-                            boolean createFolderResult = videoFile.getParentFile().mkdirs();
-                            System.out.print(createFolderResult);
+                if (!tbtn_video_pic_switch.isChecked()) {//摄像模式
+                    if (b) {//开始录制，隐藏设置时间的按钮
+                        setVideoTimeLengthBtnVisiable(false);
+                        int currentTimeLength = Integer.parseInt(tv_camera_time_value.getText().toString());
+                        mCameraView.setVideoMaxDuration(currentTimeLength * 1000);
+                        File videoFile = initVideoOrPicFile(1);
+                        if (videoFile != null) {
+                            mCameraView.startCapturingVideo(videoFile);
+                        } else {
+                            tbtn_camera.setChecked(false);
                         }
-                        mCameraView.startCapturingVideo(videoFile);
                     } else {
-                        RxToast.info("无法获取存储卡位置");
-                        compoundButton.setChecked(false);
+                        setVideoTimeLengthBtnVisiable(true);
+                        if (mCameraView.isStarted()) {
+                            mCameraView.stopCapturingVideo();
+                        }
                     }
-                    initAliYunOSS();//测试上传数据
-                } else {
-                    setVideoTimeLengthBtnVisiable(true);
-                    if (mCameraView.isStarted()) {
-                        mCameraView.stopCapturingVideo();
+                } else {//拍照模式
+                    if (b) {//拍照
+                        mCameraView.capturePicture();
                     }
                 }
             }
         });
-        //拍摄好的视频文件回调
+        //拍摄好的视频或照片文件回调
         mCameraView.addCameraListener(new CameraListener() {
             @Override
-            public void onVideoTaken(File video) {
-                super.onVideoTaken(video);
-
+            public void onPictureTaken(byte[] jpeg) {
+                super.onPictureTaken(jpeg);
+                CameraUtils.decodeBitmap(jpeg, new CameraUtils.BitmapCallback() {
+                    @Override
+                    public void onBitmapReady(Bitmap bitmap) {
+                        File picFile = initVideoOrPicFile(1);
+                        if (picFile != null) {
+                            saveBitmapFile(bitmap, picFile.getAbsolutePath());
+                        }
+                    }
+                });
+                tbtn_camera.setChecked(false);
             }
         });
     }
@@ -243,98 +248,53 @@ public class GeoCameraViewActivity extends BaseActivity {
         mCameraView.destroy();
     }
 
-    private void initAliYunOSS() {
-        String endpoint = "http://oss-cn-beijing.aliyuncs.com";
-        // 在移动端建议使用STS方式初始化OSSClient。
-        // 更多信息可查看sample 中 sts 使用方式(https://github.com/aliyun/aliyun-oss-android-sdk/tree/master/app/src/main/java/com/alibaba/sdk/android/oss/app)
-//        OSSCredentialProvider credentialProvider = new OSSStsTokenCredentialProvider("LTAI8WtDDODaqxEI", "3REJHb4GcDGvSF5ZyVl4otoUYzbv8I", "acs:ram::1453306301353415:role/xiaoxiao-role");
-        OSSCredentialProvider credentialProvider = new OSSFederationCredentialProvider() {
-            @Override
-            public OSSFederationToken getFederationToken() {
-                try {
-                    String aaaMd5 = RxTool.Md5("aaa");
-                    System.out.print("Md5------------" + RxTool.Md5("aaa"));
-                    OkHttpClient httpClient = new OkHttpClient();
-                    String deviceId = DEVICE_ID;
-                    String currentTimeTamp = String.valueOf(new Date().getTime());
-//                    RequestBody body = new FormBody.Builder().add("deviceId", deviceId).add("timestamp", currentTimeTamp).add("sign", RxTool.Md5(deviceId + currentTimeTamp)).build();
-                    HttpUrl url = new HttpUrl.Builder()
-                            .scheme("http")
-                            .host("47.104.153.134")
-                            .addPathSegments("/sts/auth")
-                            .addQueryParameter("deviceId", deviceId).addQueryParameter("timestamp", currentTimeTamp).addQueryParameter("sign", RxTool.Md5(deviceId + currentTimeTamp))
-                            .build();
-                    Request ossCredentialRequest = new Request.Builder().url(url).build();
-                    Response response = httpClient.newCall(ossCredentialRequest).execute();
-                    if (response != null) {
-                        String responseStr = response.body().string();
-                        if (!RxDataTool.isEmpty(responseStr)) {
-                            System.out.print(responseStr);
-                            JSONObject jsonObjs = new JSONObject(responseStr);
-                            String ak = jsonObjs.getString("AccessKeyId");
-                            String sk = jsonObjs.getString("AccessKeySecret");
-                            String token = jsonObjs.getString("SecurityToken");
-                            String expiration = jsonObjs.getString("Expiration");
-                            return new OSSFederationToken(ak, sk, token, expiration);
-                        }
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                return null;
+    /**
+     * @param : type-0：视频，1：照片
+     * @return :
+     * @method : initVideoOrPicFile
+     * @Author : xiaoxiao
+     * @Describe : 初始化要存储的视频或照片文件夹
+     * @Date : 2018/6/1
+     */
+    private File initVideoOrPicFile(int type) {
+        if (RxFileTool.isSDCardEnable()) {
+            String folderPath = RxFileTool.getSDCardPath() + SystemConstant.VIDEO_PATH;
+            String suffixStr = ".mp4";
+            if (type == 1) {
+                folderPath = RxFileTool.getSDCardPath() + SystemConstant.PICTURE_PATH;
+                suffixStr = ".jpg";
             }
-        };
-
-        //该配置类如果不设置，会有默认配置，具体可看该类
-        ClientConfiguration conf = new ClientConfiguration();
-        conf.setConnectionTimeout(15 * 1000); // 连接超时，默认15秒
-        conf.setSocketTimeout(15 * 1000); // socket超时，默认15秒
-        conf.setMaxConcurrentRequest(5); // 最大并发请求数，默认5个
-        conf.setMaxErrorRetry(2); // 失败后最大重试次数，默认2次
-        OSSLog.enableLog();
-        OSS oss = new OSSClient(getApplicationContext(), endpoint, credentialProvider);
-        uploadData(oss);
+            File file = new File(folderPath, RxTimeTool.date2String(RxTimeTool.getCurTimeDate(), new SimpleDateFormat("yyyyMMddhhmmss")) + suffixStr);
+            if (!file.getParentFile().exists()) {
+                boolean createFolderResult = file.getParentFile().mkdirs();
+                if (createFolderResult) {
+                    return file;
+                } else {
+                    RxToast.info("无法将视频写入到存储卡中，请检查是否有存储卡或写入权限");
+                }
+            }
+        } else {
+            RxToast.info("无法获取存储卡位置");
+        }
+        return null;
     }
 
     /**
-     * @param :
-     * @return :
-     * @method :
-     * @Author : xiaoxiao
-     * @Describe :
-     * @Date : 2018/5/18
+     * 把batmap 转file
+     *
+     * @param bitmap
+     * @param filepath
      */
-    private void uploadData(OSS oss) {
-        // 构造上传请求
-        PutObjectRequest put = new PutObjectRequest("xiaoxiao-test-1", "name", new String("测试name").getBytes());
-        // 异步上传时可以设置进度回调
-        put.setProgressCallback(new OSSProgressCallback<PutObjectRequest>() {
-            @Override
-            public void onProgress(PutObjectRequest request, long currentSize, long totalSize) {
-                Log.d("PutObject", "currentSize: " + currentSize + " totalSize: " + totalSize);
-            }
-        });
-        OSSAsyncTask task = oss.asyncPutObject(put, new OSSCompletedCallback<PutObjectRequest, PutObjectResult>() {
-            @Override
-            public void onSuccess(PutObjectRequest request, PutObjectResult result) {
-                Log.d("PutObject", "UploadSuccess");
-            }
-
-            @Override
-            public void onFailure(PutObjectRequest request, ClientException clientExcepion, ServiceException serviceException) {
-                // 请求异常
-                if (clientExcepion != null) {
-                    // 本地异常如网络异常等
-                    clientExcepion.printStackTrace();
-                }
-                if (serviceException != null) {
-                    // 服务异常
-                    Log.e("ErrorCode", serviceException.getErrorCode());
-                    Log.e("RequestId", serviceException.getRequestId());
-                    Log.e("HostId", serviceException.getHostId());
-                    Log.e("RawMessage", serviceException.getRawMessage());
-                }
-            }
-        });
+    public static File saveBitmapFile(Bitmap bitmap, String filepath) {
+        File file = new File(filepath);//将要保存图片的路径
+        try {
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bos);
+            bos.flush();
+            bos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return file;
     }
 }

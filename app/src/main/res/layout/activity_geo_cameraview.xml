@@ -10,12 +10,15 @@
         android:layout_height="match_parent"
         android:keepScreenOn="true"
         app:cameraSessionType="picture" />
+
     <LinearLayout
+        android:id="@+id/layer_video_time_control"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:layout_alignParentRight="true"
-        android:layout_alignParentTop="true">
+        android:layout_alignParentTop="true"
+        android:orientation="horizontal">
+
         <Button
             android:id="@+id/btn_video_time_sub"
             android:layout_width="wrap_content"
@@ -24,15 +27,18 @@
             android:layout_alignParentTop="true"
             android:layout_marginRight="@dimen/activity_vertical_margin"
             android:text="-" />
+
         <TextView
             android:id="@+id/tv_camera_time_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="3"/>
+            android:text="3" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="分钟"/>
+            android:text="分钟" />
+
         <Button
             android:id="@+id/btn_video_time_add"
             android:layout_width="wrap_content"
@@ -43,13 +49,28 @@
             android:text="+" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:orientation="horizontal">
+
+        <ToggleButton
+            android:id="@+id/tbtn_video_pic_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textOff="视频"
+            android:textOn="照片" />
+    </LinearLayout>
+
 
     <ToggleButton
         android:id="@+id/tbtn_camera"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
         android:layout_alignParentBottom="true"
-        android:textOn="结束录制"
-        android:textOff="开始录制"/>
+        android:layout_centerHorizontal="true"
+        android:textOff="开始录制"
+        android:textOn="结束录制" />
 </RelativeLayout>
