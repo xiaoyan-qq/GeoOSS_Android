@@ -1,7 +1,6 @@
 package com.example.xiaoxiao.geooss_android.util;
 
 import android.content.Context;
-import android.util.Log;
 
 import com.alibaba.sdk.android.oss.ClientException;
 import com.alibaba.sdk.android.oss.OSS;
@@ -22,7 +21,6 @@ import com.vondear.rxtools.RxTool;
 import org.json.JSONObject;
 
 import java.util.Date;
-import java.util.List;
 
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
@@ -94,42 +92,66 @@ public class AliYunUtil {
      * @return :
      * @method :
      * @Author : xiaoxiao
-     * @Describe :
+     * @Describe : 异步方式上传文件
      * @Date : 2018/5/18
      */
-    public OSSAsyncTask uploadData(OSS oss, List<PutObjectRequest> putList, OSSProgressCallback progressCallback, OSSCompletedCallback completedCallback) {
+    public OSSAsyncTask uploadDataAsync(OSS oss, PutObjectRequest put, OSSProgressCallback progressCallback, OSSCompletedCallback completedCallback) {
         // 构造上传请求
-        PutObjectRequest put = new PutObjectRequest("xiaoxiao-test", "name", new String("测试name").getBytes());
+//        PutObjectRequest put = new PutObjectRequest("xiaoxiao-test", "name", new String("测试name").getBytes());
         // 异步上传时可以设置进度回调
-        put.setProgressCallback(new OSSProgressCallback<PutObjectRequest>() {
-            @Override
-            public void onProgress(PutObjectRequest request, long currentSize, long totalSize) {
-                Log.d("PutObject", "currentSize: " + currentSize + " totalSize: " + totalSize);
-            }
-        });
-        OSSAsyncTask task = oss.asyncPutObject(put, new OSSCompletedCallback<PutObjectRequest, PutObjectResult>() {
-            @Override
-            public void onSuccess(PutObjectRequest request, PutObjectResult result) {
-                Log.d("PutObject", "UploadSuccess");
-            }
-
-            @Override
-            public void onFailure(PutObjectRequest request, ClientException clientExcepion, ServiceException serviceException) {
-                // 请求异常
-                if (clientExcepion != null) {
-                    // 本地异常如网络异常等
-                    clientExcepion.printStackTrace();
-                }
-                if (serviceException != null) {
-                    // 服务异常
-                    Log.e("ErrorCode", serviceException.getErrorCode());
-                    Log.e("RequestId", serviceException.getRequestId());
-                    Log.e("HostId", serviceException.getHostId());
-                    Log.e("RawMessage", serviceException.getRawMessage());
-                }
-            }
-        });
+//        put.setProgressCallback(new OSSProgressCallback<PutObjectRequest>() {
+//            @Override
+//            public void onProgress(PutObjectRequest request, long currentSize, long totalSize) {
+//                Log.d("PutObject", "currentSize: " + currentSize + " totalSize: " + totalSize);
+//            }
+//        });
+        put.setProgressCallback(progressCallback);
+        OSSAsyncTask task = oss.asyncPutObject(put, completedCallback
+//                new OSSCompletedCallback<PutObjectRequest, PutObjectResult>() {
+//            @Override
+//            public void onSuccess(PutObjectRequest request, PutObjectResult result) {
+//                Log.d("PutObject", "UploadSuccess");
+//            }
+//
+//            @Override
+//            public void onFailure(PutObjectRequest request, ClientException clientExcepion, ServiceException serviceException) {
+//                // 请求异常
+//                if (clientExcepion != null) {
+//                    // 本地异常如网络异常等
+//                    clientExcepion.printStackTrace();
+//                }
+//                if (serviceException != null) {
+//                    // 服务异常
+//                    Log.e("ErrorCode", serviceException.getErrorCode());
+//                    Log.e("RequestId", serviceException.getRequestId());
+//                    Log.e("HostId", serviceException.getHostId());
+//                    Log.e("RawMessage", serviceException.getRawMessage());
+//                }
+//            }
+//        }
+        );
         return task;
+    }
+
+    /**
+     * @param :
+     * @return :
+     * @method : uploadData
+     * @Author : xiaoxiao
+     * @Describe : 同步方式上传数据
+     * @Date : 2018/6/7
+     */
+    public PutObjectResult uploadData(OSS oss, PutObjectRequest put) {
+        try {
+            if (put != null && oss != null) {
+                return oss.putObject(put);
+            }
+        } catch (ClientException e) {
+            e.printStackTrace();
+        } catch (ServiceException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**

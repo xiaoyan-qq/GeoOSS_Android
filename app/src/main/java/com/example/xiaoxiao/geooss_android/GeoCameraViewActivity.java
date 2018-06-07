@@ -1,6 +1,5 @@
 package com.example.xiaoxiao.geooss_android;
 
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -17,22 +16,15 @@ import com.otaliastudios.cameraview.CameraUtils;
 import com.otaliastudios.cameraview.CameraView;
 import com.otaliastudios.cameraview.SessionType;
 import com.vondear.rxtools.RxFileTool;
+import com.vondear.rxtools.RxThreadPoolTool;
 import com.vondear.rxtools.RxTimeTool;
 import com.vondear.rxtools.view.RxToast;
-import com.vondear.rxtools.view.dialog.RxDialogSure;
-import com.vondear.rxtools.view.dialog.RxDialogSureCancel;
-import com.yanzhenjie.permission.Action;
-import com.yanzhenjie.permission.AndPermission;
-import com.yanzhenjie.permission.Permission;
-import com.yanzhenjie.permission.Rationale;
-import com.yanzhenjie.permission.RequestExecutor;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.List;
 
 public class GeoCameraViewActivity extends BaseActivity {
     private Button btn_video_time_add, btn_video_time_sub;
@@ -41,94 +33,16 @@ public class GeoCameraViewActivity extends BaseActivity {
     private TextView tv_camera_time_value;
     private CameraView mCameraView;
     private ToggleButton tbtn_camera;
+    private RxThreadPoolTool threadPoolTool;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_geo_cameraview);
 
+        threadPoolTool = new RxThreadPoolTool(RxThreadPoolTool.Type.SingleThread, 1);
         initView();
-        //申请权限
-        getSomePermission();
     }
-
-    private void getSomePermission() {
-        AndPermission.with(this)
-                .permission(Permission.Group.CAMERA, Permission.Group.STORAGE)
-                .onGranted(new Action() {
-                    @Override
-                    public void onAction(List<String> permissions) {
-                        // TODO what to do.
-                    }
-                })
-                .onDenied(new Action() {
-                    @Override
-                    public void onAction(List<String> permissions) {
-                        if (AndPermission.hasAlwaysDeniedPermission(GeoCameraViewActivity.this, permissions)) {
-                            // TODO what to do
-                            StringBuilder sb = null;
-                            if (permissions != null) {
-                                sb = new StringBuilder();
-                                for (String permission : permissions) {
-                                    sb.append(permission + ",");
-                                }
-                            }
-                            if (sb != null) {
-                                sb.substring(0, sb.length() - 1);
-                            }
-                            final RxDialogSure rxDialogSure = new RxDialogSure(GeoCameraViewActivity.this);
-                            rxDialogSure.setTitle("提示");
-                            rxDialogSure.setContent("您拒绝了" + sb + "等权限，可能导致部分功能无法正常使用，您可以在系统设置-应用管理中再次打开这些权限以获取完整的应用体验");
-                            rxDialogSure.setSure("确定");
-                            rxDialogSure.setSureListener(new View.OnClickListener() {
-                                @Override
-                                public void onClick(View view) {
-                                    rxDialogSure.dismiss();
-                                }
-                            });
-                            rxDialogSure.show();
-                        }
-                    }
-                })
-                .rationale(mRationale)
-                .start();
-    }
-
-    private Rationale mRationale = new Rationale() {
-        @Override
-        public void showRationale(Context context, List<String> permissions,
-                                  final RequestExecutor executor) {
-            StringBuilder sb = null;
-            if (permissions != null) {
-                sb = new StringBuilder();
-                for (String permission : permissions) {
-                    sb.append(permission + ",");
-                }
-            }
-            // 这里使用一个Dialog询问用户是否继续授权。
-            final RxDialogSureCancel rxDialogSureCancel = new RxDialogSureCancel(GeoCameraViewActivity.this);
-            rxDialogSureCancel.setTitle("提示");
-            rxDialogSureCancel.setContent("您拒绝了" + sb + "等权限，可能导致部分功能无法正常使用，是否重新授权");
-            rxDialogSureCancel.setSure("确定");
-            rxDialogSureCancel.setSureListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    rxDialogSureCancel.dismiss();
-                    // 如果用户继续：
-                    executor.execute();
-                }
-            });
-            rxDialogSureCancel.setCancel("取消");
-            rxDialogSureCancel.setCancelListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    // 如果用户中断：
-                    executor.cancel();
-                }
-            });
-            rxDialogSureCancel.show();
-        }
-    };
 
     private void initView() {
         layer_time_control = findViewById(R.id.layer_video_time_control);
@@ -184,20 +98,9 @@ public class GeoCameraViewActivity extends BaseActivity {
             public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
                 if (!tbtn_video_pic_switch.isChecked()) {//摄像模式
                     if (b) {//开始录制，隐藏设置时间的按钮
-                        setVideoTimeLengthBtnVisiable(false);
-                        int currentTimeLength = Integer.parseInt(tv_camera_time_value.getText().toString());
-                        mCameraView.setVideoMaxDuration(currentTimeLength * 1000);
-                        File videoFile = initVideoOrPicFile(1);
-                        if (videoFile != null) {
-                            mCameraView.startCapturingVideo(videoFile);
-                        } else {
-                            tbtn_camera.setChecked(false);
-                        }
+                        startVideo();
                     } else {
-                        setVideoTimeLengthBtnVisiable(true);
-                        if (mCameraView.isStarted()) {
-                            mCameraView.stopCapturingVideo();
-                        }
+                        stopVideo();//停止录制
                     }
                 } else {//拍照模式
                     if (b) {//拍照
@@ -214,7 +117,7 @@ public class GeoCameraViewActivity extends BaseActivity {
                 CameraUtils.decodeBitmap(jpeg, new CameraUtils.BitmapCallback() {
                     @Override
                     public void onBitmapReady(Bitmap bitmap) {
-                        File picFile = initVideoOrPicFile(1);
+                        File picFile = initPicOrVideoCacheFile(1);
                         if (picFile != null) {
                             saveBitmapFile(bitmap, picFile.getAbsolutePath());
                         }
@@ -222,7 +125,56 @@ public class GeoCameraViewActivity extends BaseActivity {
                 });
                 tbtn_camera.setChecked(false);
             }
+
+            @Override
+            public void onVideoTaken(final File video) {
+                super.onVideoTaken(video);
+                threadPoolTool.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        //将该文件剪切到视频文件夹下
+                        File videoFile = initPicOrVideoCacheFile(2);
+                        RxFileTool.copyOrMoveFile(video, videoFile, true);
+                    }
+                });
+
+                //视频拍摄结束
+                if (tbtn_camera.isChecked()) {//如果当前的录制状态仍然为正在录制，则重新开辟一块新的文件继续录制
+                    startVideo();
+                }
+            }
         });
+    }
+
+    /**
+     * @param :
+     * @return :
+     * @method :
+     * @Author : xiaoxiao
+     * @Describe : 开始拍摄视频
+     * @Date : 2018/6/7
+     */
+    private void startVideo() {
+        setVideoTimeLengthBtnVisiable(false);
+        int currentTimeLength = Integer.parseInt(tv_camera_time_value.getText().toString());
+        mCameraView.setVideoMaxDuration(currentTimeLength * 1000 * 60);
+        File videoFile = initPicOrVideoCacheFile(0);
+        if (videoFile != null) {
+            if (!mCameraView.isCapturingVideo()) {
+                mCameraView.stopCapturingVideo();
+            }
+            mCameraView.startCapturingVideo(videoFile);
+        } else {
+            tbtn_camera.setChecked(false);//如果无法保存到文件，则自动停止录制
+            RxToast.error("无法保存录制的文件！");
+        }
+    }
+
+    private void stopVideo() {
+        setVideoTimeLengthBtnVisiable(true);
+        if (mCameraView.isStarted()) {
+            mCameraView.stopCapturingVideo();
+        }
     }
 
     private void setVideoTimeLengthBtnVisiable(boolean isVisiable) {
@@ -249,22 +201,25 @@ public class GeoCameraViewActivity extends BaseActivity {
     }
 
     /**
-     * @param : type-0：视频，1：照片
+     * @param : 保存类型： 0-缓存目录 1-图片目录 2-视频目录
      * @return :
-     * @method : initVideoOrPicFile
+     * @method : initPicCacheFile
      * @Author : xiaoxiao
-     * @Describe : 初始化要存储的视频或照片文件夹
-     * @Date : 2018/6/1
+     * @Describe : 初始化缓存目录，用户的摄像以及拍照都是首先存储在此缓存目录中，当数据完全写入完成后才会将其转移到指定的视频或拍照目录中
+     * @Date : 2018/6/7
      */
-    private File initVideoOrPicFile(int type) {
+    private File initPicOrVideoCacheFile(int type) {
         if (RxFileTool.isSDCardEnable()) {
-            String folderPath = RxFileTool.getSDCardPath() + SystemConstant.VIDEO_PATH;
+            String folderPath = RxFileTool.getSDCardPath() + SystemConstant.CACHE_VIDEO_PICTURE_PATH;
             String suffixStr = ".mp4";
             if (type == 1) {
                 folderPath = RxFileTool.getSDCardPath() + SystemConstant.PICTURE_PATH;
                 suffixStr = ".jpg";
+            } else if (type == 2) {
+                folderPath = RxFileTool.getSDCardPath() + SystemConstant.VIDEO_PATH;
+                suffixStr = ".mp4";
             }
-            File file = new File(folderPath, RxTimeTool.date2String(RxTimeTool.getCurTimeDate(), new SimpleDateFormat("yyyyMMddhhmmss")) + suffixStr);
+            File file = new File(folderPath, RxTimeTool.date2String(RxTimeTool.getCurTimeDate(), new SimpleDateFormat("yyyyMMddHHmmss")) + suffixStr);
             if (!file.getParentFile().exists()) {
                 boolean createFolderResult = file.getParentFile().mkdirs();
                 if (createFolderResult) {
@@ -272,6 +227,8 @@ public class GeoCameraViewActivity extends BaseActivity {
                 } else {
                     RxToast.info("无法将视频写入到存储卡中，请检查是否有存储卡或写入权限");
                 }
+            } else {
+                return file;
             }
         } else {
             RxToast.info("无法获取存储卡位置");
